@@ -1,9 +1,75 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
-from books.models import Book
-from .serializers import BooksSerializer
+from books.models import Book, Publisher, Author
+from .serializers import BooksSerializer, PublisherSerializer, AuthorSerializer
 from rest_framework.response import Response
+
+# ----- AUTHORS -----
+# Author List View
+class AuthorListView(generics.ListAPIView):
+    serializer_class = AuthorSerializer
+    
+    def get_queryset(self):
+        page = self.request.query_params.get('page', 0)
+        size = self.request.query_params.get('size', 20)
+        sort = self.request.query_params.get('sort', 'name')
+        type = self.request.query_params.get('type', 'asc')
+        
+        if sort not in [field.name for field in Author._meta.fields]:
+            sort = 'name'
+        
+        if type not in ['asc', 'desc']:
+            type = 'asc'
+        
+        queryset = Author.objects.all().order_by(f'{type}{sort}')
+        
+        start = int(page) * int(size)
+        end = start + int(size)
+        
+        return queryset[start:end]
+    
+# Author Create View
+class AuthorCreateView(generics.CreateAPIView):
+    serializer_class = AuthorSerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+# Author Detail View
+class AuthorDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = AuthorSerializer
+    
+    def get_queryset(self):
+        return Author.objects.all()
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        self.perform_update(serializer)
+        return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        
+        if instance.books.exists():
+            return Response({'error': 'Author has related books, cannot be deleted'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 # ----- BOOKS -----
 # Book List View
@@ -93,3 +159,46 @@ class BookDetailView(generics.RetrieveUpdateDestroyAPIView):
         
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+# ----- PUBLISHERS -----
+# Publisher List View
+class PublisherListView(generics.ListAPIView):
+    queryset = Publisher.objects.all()
+    serializer_class = PublisherSerializer
+    
+    def get_queryset(self):
+        page = self.request.query_params.get('page', 0)
+        size = self.request.query_params.get('size', 20)
+        sort = self.request.query_params.get('sort', 'name')
+        type = self.request.query_params.get('type', 'asc')
+        
+        queryset = super().get_queryset()
+        
+        if sort not in [field.name for field in Publisher._meta.fields]:
+            sort = 'name'
+            
+        if type not in ['asc', 'desc']:
+            type = 'asc'
+            
+        queryset = queryset.order_by(f'{type}{sort}')
+        
+        start = int(page) * int(size)
+        end = start + int(size)
+        
+        return queryset[start:end]
+    
+# Publisher Detail View
+class PublisherDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Publisher.objects.all()
+    serializer_class = PublisherSerializer
+    
+# Publisher Create View
+class PublisherCreateView(generics.CreateAPIView):
+    serializer_class = PublisherSerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
