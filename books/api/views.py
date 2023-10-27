@@ -1,8 +1,8 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
-from books.models import Book, Publisher, Author
-from .serializers import BooksSerializer, PublisherSerializer, AuthorSerializer
+from books.models import Book, Publisher, Author, Category
+from .serializers import BooksSerializer, PublisherSerializer, AuthorSerializer, CategorySerializer
 from rest_framework.response import Response
 
 # ----- AUTHORS -----
@@ -68,6 +68,62 @@ class AuthorDetailView(generics.RetrieveUpdateDestroyAPIView):
         if instance.books.exists():
             return Response({'error': 'Author has related books, cannot be deleted'}, status=status.HTTP_400_BAD_REQUEST)
         
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+# ----- BOOKS -----
+# Category List View
+class CategoryListView(generics.ListAPIView):
+    serializer_class = CategorySerializer
+    
+    def get_queryset(self):
+        page = self.request.query_params.get('page', 0)
+        size = self.request.query_params.get('size', 20)
+        sort = self.request.query_params.get('sort', 'name')
+        type = self.request.query_params.get('type', 'asc')
+        
+        queryset = Category.objects.all().order_by(f'{type}{sort}')
+        
+        start = int(page) * int(size)
+        end = start + int(size)
+        
+        return queryset[start:end]
+
+# Category Create View
+class CategoryCreateView(generics.CreateAPIView):
+    serializer_class = CategorySerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+# Category Detail View
+class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = CategorySerializer
+    
+    def get_queryset(self):
+        return Category.objects.all()
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        self.perform_update(serializer)
+        return Response(serializer.data)
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 

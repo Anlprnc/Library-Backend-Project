@@ -1,9 +1,65 @@
-from rest_framework import generics, status
-from user.models import Loan
-from .serializers import LoanSerializer
+from rest_framework import generics, status, permissions
+from user.models import Loan, User
+from .serializers import LoanSerializer, UserSerializer, SignInSerializer, RegisterSerializer
 from books.models import Book
 from rest_framework.response import Response
+from django.contrib.auth import authenticate
+from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .permissions import MemberPermission, EmployeePermission
 
+# ----- AUTHENTICATION -----
+# Sign In View
+class SignInView(generics.CreateAPIView):
+    serializer_class = SignInSerializer
+    
+    def create(self, request, *args, **kwargs):
+        # Kullanıcıyı e-posta adresiyle bulmaya çalış
+        try:
+            user = User.objects.get(email=request.data['email'])
+        except User.DoesNotExist:
+            return Response({'error': 'Kullanıcı bulunamadı.'}, status=status.HTTP_404_NOT_FOUND)
+        except User.MultipleObjectsReturned:
+            return Response({'error': 'Birden fazla kullanıcı bulundu. Bu bir hata olabilir.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        access_token = str(AccessToken.for_user(user))
+        return Response({'token': access_token})
+
+# Register View
+class RegisterView(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
+    
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        return Response({'message': 'Registration successfully done', 'success': True})
+    
+# User List View
+class UserCreateView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    
+    permission_classes = [permissions.AllowAny]
+    
+    def get_permissions(self):
+        if self.request.user.is_authenticated:
+            if self.request.user.role == 'member':
+                self.permission_classes = [MemberPermission]
+            elif self.request.user.role == 'employee':
+                self.permission_classes = [EmployeePermission]
+            elif self.request.user.role == 'admin':
+                self.permission_classes = [permissions.IsAdminUser]
+                
+        return super().get_permissions()
+    
+# Users
+class UserListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [EmployeePermission, permissions.IsAdminUser]
+    
+    def get_queryset(self):
+        return User.objects.all()
+    
 # ----- LOANS -----
 # Loan List View
 class LoanListView(generics.ListAPIView):
@@ -87,6 +143,14 @@ class UserLoanListView(generics.ListAPIView):
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+# User Loan Create View    
+class UserCreateLoanView(generics.CreateAPIView):
+    serializer_class = LoanSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
     
 # Book Loan List View
 class BookListLoanView(generics.ListAPIView):

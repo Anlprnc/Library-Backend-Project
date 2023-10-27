@@ -1,11 +1,13 @@
 from django.db import models
 from books.models import Book
 from django.core.validators import RegexValidator
+from django_use_email_as_username.models import BaseUser, BaseUserManager
+from django.contrib.auth.models import Group, Permission
 
 
 # Create your models here.
 
-class User(models.Model):
+class User(BaseUser):
     phone_regex = RegexValidator(
         regex=r'^\(\d{3}\) \d{3}-\d{4}$',
         message="Phone number must be in the format: (999) 999-9999"
@@ -17,11 +19,13 @@ class User(models.Model):
     address = models.CharField(max_length=100)
     phone = models.CharField(validators=[phone_regex], max_length=17)
     birthDate = models.DateField()
-    email = models.EmailField(max_length=80)
+    email = models.EmailField(max_length=80, unique=True)
     password = models.CharField(max_length=30)
     createDate = models.DateTimeField(auto_now_add=True)
     resetPasswordCode = models.CharField(max_length=6, blank=True, null=True)
     builtIn = models.BooleanField(default=False)
+    
+    objects = BaseUserManager()
     
     class Meta:
         verbose_name = 'User'
