@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from django.db import models
 from books.models import Book
 from django.core.validators import RegexValidator
@@ -15,7 +16,7 @@ class User(BaseUser):
     
     firstName = models.CharField(max_length=30)
     lastName = models.CharField(max_length=30)
-    score = models.IntegerField(default=0)
+    score = models.IntegerField(default=0, choices=[(-2, '-2'), (-1, '-1'), (0, '0'), (1, '1'), (2, '2')])
     address = models.CharField(max_length=100)
     phone = models.CharField(validators=[phone_regex], max_length=17)
     birthDate = models.DateField()
@@ -49,6 +50,12 @@ class Loan(models.Model):
         
     def __str__(self):
         return f"{self.user} - {self.book}"
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        
+        self.user.score += 1
+        self.user.save()
     
     
 class Role(models.Model):

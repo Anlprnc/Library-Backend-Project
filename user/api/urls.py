@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import LoanListView, LoanCreateView, LoanDetailView, UserLoanListView, BookListLoanView, AuthLoanDetailView, SignInView, RegisterView, UserCreateView, UserCreateLoanView, UserListView
+from .views import LoanListView, LoanCreateView, LoanDetailView, UserLoanListView, BookListLoanView, AuthLoanDetailView, SignInView, RegisterView, UserCreateView, UserCreateLoanView, UserListView, UsersDetailView
 
 
 urlpatterns = [
@@ -14,6 +14,7 @@ urlpatterns = [
     path('signin/', SignInView.as_view(), name='signin'),
     path('register/', RegisterView.as_view(), name='register'),
     path('users/', UserListView.as_view(), name='user-list'),
+    path('users/<int:pk>/', UsersDetailView.as_view(), name='users-detail'),
     path('user/create/', UserCreateView.as_view(), name='user-create'),
     path('user/loan/create/', UserCreateLoanView.as_view(), name='user-loan-create'),
 ]
