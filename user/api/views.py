@@ -1,13 +1,17 @@
 from rest_framework import generics, status, permissions
 from user.models import Loan, User
 from .serializers import LoanSerializer, UserSerializer, SignInSerializer, RegisterSerializer
-from books.models import Book
+from books.models import Book, Author, Publisher, Category
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .permissions import MemberPermission, EmployeePermission, IsEmployeeOrAdmin, IsAdmin
+from .permissions import MemberPermission, EmployeePermission, IsEmployeeOrAdmin, IsAdmin, IsMemberOrEmployeeOrAdmin
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.db import models
+from datetime import datetime
 
 # ----- AUTHENTICATION -----
 # Sign In View
@@ -192,3 +196,96 @@ class AuthLoanDetailView(generics.RetrieveAPIView):
     
     def get_queryset(self):
         return Loan.objects.select_related('user', 'book').all()
+    
+# ----- REPORTS -----
+# Get Statistic
+def get_statistic(request):
+    statistics = {
+        'books': Book.objects.count(),
+        'authors': Author.objects.count(),
+        'publishers': Publisher.objects.count(),
+        'categories': Category.objects.count(),
+        'loans': Loan.objects.count(),
+        'unReturnedBooks': Loan.objects.filter(returned=False).count(),
+        'expiredBooks': Loan.objects.filter(expired=True).count(),
+        'members': User.objects.count()
+    }
+    
+    return JsonResponse({'dashboard': statistics})
+
+# Most Popular Books
+def most_popular_books(request):
+    amount = int(request.GET.get('amount', 20))
+    page = int(request.GET.get('page', 0))
+    size = int(request.GET.get('size', 20))
+    
+    loans = Loan.objects.values('book__id', 'book__name', 'book__isbn').annotate(borrow_count=models.Count('book__loan')).order_by('-borrow_count')[:amount]
+    
+    paginator = Paginator(loans, size)
+    page_data = paginator.get_page(page + 1)
+    
+    response_data = [{
+        'id': item['book__id'],
+        'name': item['book__name'],
+        'isbn': item['book__isbn'],
+    } for item in page_data]
+    
+    return JsonResponse(response_data, safe=False)
+
+# Unreturned Books
+def unreturned_books(request):
+    page = int(request.GET.get('page', 0))
+    size = int(request.GET.get('size', 20))
+    sort = request.GET.get('sort', 'expireDate')
+    sort_type = request.GET.get('type', 'desc')
+    
+    unreturned_books = Loan.objects.filter(returnDate__isnull=True).order_by(f'{sort_type}{sort}')
+    
+    paginator = Paginator(unreturned_books, size)
+    page_data = paginator.get_page(page + 1)
+    
+    response_data = [{
+        'id': item.book.id,
+        'name': item.book.name,
+        'isbn': item.book.isbn,
+    } for item in page_data]
+    
+    return JsonResponse(response_data, safe=False)
+
+# Expired Books
+def expired_books(request):
+    page = int(request.GET.get('page', 0))
+    size = int(request.GET.get('size', 20))
+    sort = request.GET.get('sort', 'expireDate')
+    sort_type = request.GET.get('type', 'desc')
+    
+    now = datetime.now()
+    expired_books = Loan.objects.filter(returnDate__isnull=True, expireDate__lt=now).order_by(f'{sort_type}{sort}')
+    
+    paginator = Paginator(expired_books, size)
+    page_data = paginator.get_page(page + 1)
+    
+    response_data = [{
+        'id': item.book.id,
+        'name': item.book.name,
+        'isbn': item.book.isbn,
+    } for item in page_data]
+    
+    return JsonResponse(response_data, safe=False)
+
+# Most Borrowers
+def most_borrowers(request):
+    page = int(request.GET.get('page', 0))
+    size = int(request.GET.get('size', 20))
+    
+    borrowers = Loan.objects.values('user__id', 'user_firstName', 'user_lastName').annotate(borrow_count=models.Count('user')).order_by('-borrow_count')
+    
+    paginator = Paginator(borrowers, size)
+    page_data = paginator.get_page(page + 1)
+    
+    response_data = [{
+        'id': item['user__id'],
+        'name': f'{item["user_firstName"]} {item["user_lastName"]}',
+    } for item in page_data]
+    
+    return JsonResponse(response_data, safe=False)

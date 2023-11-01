@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import LoanListView, LoanCreateView, LoanDetailView, UserLoanListView, BookListLoanView, AuthLoanDetailView, SignInView, RegisterView, UserCreateView, UserCreateLoanView, UserListView, UsersDetailView
+from .views import LoanListView, LoanCreateView, LoanDetailView, UserLoanListView, BookListLoanView, AuthLoanDetailView, SignInView, RegisterView, UserCreateView, UserCreateLoanView, UserListView, UsersDetailView, get_statistic, most_popular_books, unreturned_books, expired_books, most_borrowers
 
 
 urlpatterns = [
@@ -17,4 +17,10 @@ urlpatterns = [
     path('users/<int:pk>/', UsersDetailView.as_view(), name='users-detail'),
     path('user/create/', UserCreateView.as_view(), name='user-create'),
     path('user/loan/create/', UserCreateLoanView.as_view(), name='user-loan-create'),
+    # REPORTS
+    path('report/', get_statistic, name='statistics_report'),
+    path('report/most-popular-books/', most_popular_books, name='most_popular_books'),
+    path('report/unreturned-books/', unreturned_books, name='unreturned_books'),
+    path('report/expired-books/', expired_books, name='expired_books_report'),
+    path('report/most-borrowers/', most_borrowers, name='most_borrowers'),
 ]
